@@ -1,0 +1,134 @@
+---
+title: Shipping the Anyone Protocol dashboard
+description: Rebuilding the token staking experience and hardening the dashboard for mainnet on a decentralized privacy network.
+date: 2026-06-06
+tags: [case-study]
+cover: cover.avif
+---
+
+Over an eight-month engagement with Anyone Protocol, I took ownership of the [Anyone Dashboard](https://dashboard.anyone.io/), which included implementing a token staking experience, as well as bringing the rest of the web
+application up to a new standard ahead of their mainnet launch, which landed in
+December 2025.
+
+[Anyone Protocol](https://www.anyone.io/) is a decentralized privacy network where independent operators run relays and earn
+[on-chain](https://www.coinbase.com/en-gb/learn/tips-and-tutorials/onchain-vs-offchain-cryptocurrency-transactions-what-is-the-difference) rewards for routing traffic. I came onto the project through
+[Memetic Block](https://memeticblock.com), whom have been helping Anyone to shape their product over the last 3 years. The
+broader engagement is written up in [their case
+study](https://memeticblock.com/case-studies/anyone-protocol).
+
+## The challenge
+
+A decentralized privacy network only works if there are incentivized relay operators, and those operators only show up if the
+economics are legible and the tooling is trustworthy. On the latter point, the task ahead was clear: (re)build a dashboard experience that lets
+token holders stake to specific relay operators, claim rewards, and manage their
+position, all settled on-chain and able to hold up on mainnet.
+
+## The work
+
+I was handed a design for the new staking page and not much else. From there the work
+became designing in code: implementing the page, prototyping the flows that weren't
+designed for, and figuring out what actually made sense once real on-chain data and
+edge cases were in front of me, in a tight feedback loop with the protocol devs and the
+client. Alongside that, I brought the rest of the dashboard's theme tokens and
+components up to the standard of the new design.
+
+The dashboard is a Nuxt app, styled with Nuxt UI and Tailwind. Server state runs on
+TanStack Query with an IndexedDB cache layer, and the on-chain layer is wagmi + Reown.
+
+Below are the key points of impact I had while working on the dashboard.
+
+### The staking flow
+
+I built the frontend staking flow end to end: staking, unstaking, partial stakes, and
+claiming and withdrawing rewards, with dedicated composables and a simple UX flow.
+
+<Figure
+  videoWebm="staking-flow.webm"
+  videoMp4="staking-flow.mp4"
+  poster="staking-flow.png"
+  aspect={1280 / 782}
+  alt="Staking tokens to a relay operator"
+  caption="Staking to an operator."
+/>
+
+### Implementing search and filtering
+
+For staking to bare meaning in the system, operator discovery was crucial. Users needed to be able to find someone to stake to. I built an operator discovery experience with no design as a guide this time. What I ended up shipping:
+
+- Users could search by wallet address or ENS-style domain
+- Dynamic filtering that allowed users to view operators based on their own stakes, total stakes, and running status
+- Domain popovers that played the role of progressively disclosing operators with multiple domains in an already information-dense UI
+
+All of these features were important to have as part of the staking page so a user could go from a raw address to a staked
+position without leaving the flow.
+
+<Figure
+  videoWebm="operator-discovery.webm"
+  videoMp4="operator-discovery.mp4"
+  poster="operator-discovery.png"
+  aspect={1768 / 1080}
+  alt="Searching for a relay operator by address and domain, and filtering by stakes and running status"
+  caption="Operator search and filtering functionality at play."
+/>
+
+### Rewards and rewards history
+
+Sitting on top of staking was a rewards and rewards-history system covering relay
+rewards, staking rewards, per-relay claimed amounts, and multiplier display, all
+recalculating reactively as on-chain data changed underneath it.
+
+<Figure
+  videoWebm="rewards-history.webm"
+  videoMp4="rewards-history.mp4"
+  poster="rewards-history.png"
+  aspect={1768 / 1080}
+  alt="Rewards history showing relay and staking rewards with per-relay claimed amounts and multipliers"
+  caption="Rewards history with per-relay breakdown and multipliers."
+/>
+
+### Under the hood
+
+A lot of the work that mattered most has nothing to show on screen. It's the
+difference between a UI that quietly lies to you about your money and one you can
+trust. The non-visual work fell into three buckets.
+
+**Smart-contract integration**
+
+- Led the migration from the legacy Facilitator contract to the new Hodler contract,
+  standing up a fresh `composables/hodler` module (ABI plus logic) for redeeming,
+  locking, and unlocking.
+- Modernized the wallet layer, migrating from the deprecated Web3Modal to Reown and
+  refreshing the wagmi config.
+- Fixed a series of BigInt/BigNumber conversion and rounding errors in the staking and
+  reward maths that had been producing incorrect token amounts and `NaN` displays.
+- Built a gas-budget safeguard: it detects when a user's on-chain gas budget falls
+  below a 0.002 ETH threshold and auto-funds the contract before redeeming, turning a
+  confusing failed transaction into something that _just works_.
+
+**Performance and data layer**
+
+- Introduced an IndexedDB-backed operator cache, with custom serialization for the
+  BigInt domain token IDs that don't survive a naive round-trip.
+- Moved relay data fetching onto a TanStack Query architecture (dedicated `queries/`
+  and `mutations/` composables) replacing ad-hoc fetching, resolving a cluster of
+  stale-data and race-condition bugs that surfaced on page navigation.
+- Added incremental, virtualized loading to the operator table so long lists stayed
+  responsive.
+
+**Launch hardening**
+
+- Built a feature-flag system and a staged [HyperBEAM](https://github.com/permaweb/HyperBEAM) query
+  rollout so new on-chain data sources could ship with easy rollback.
+- Cleared security and dependency-audit findings and patched vulnerabilities before
+  going live.
+- Worked through a long tail of reactivity bugs: infinite lock-status spinners, race
+  conditions on lock/unlock, stale allowances, and rewards that wouldn't refresh.
+- Added robust input validation for staking, rejecting invalid characters, capping at
+  available balance, and surfacing clear error messages.
+
+## The results
+
+The dashboard shipped to mainnet in December 2025, the staking experience went live
+with it, and active operators on the network grew 34% around the launch to a total of 22,000 registered relays and counting. It landed across 20+ versioned releases, and remains the live dashboard operators and stakers use today, with over 7,600 relays serving 69+ Gbps of bandwith, and over 8 million **$ANYONE** tokens locked.
+
+Though there were many challenges throughout the build, it was an incredibly rewarding experience to take the dashboard to launch for such an important project in the DePIN space.
